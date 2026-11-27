@@ -2,33 +2,131 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111f">
 <title>OS GUARDIÕES</title>
 <style>
-body {
- background: #07111f;
- color: #65eaff;
- font-family: Arial, sans-serif;
- text-align: center;
- padding: 30px 15px;
-}
-h1 { margin-top: 60px; letter-spacing: 4px; }
-p { color: white; }
-button {
- background: #087b8b;
- color: white;
- border: 0;
- border-radius: 12px;
- padding: 15px;
- font-size: 17px;
-}
+body{margin:0;background:#07111f;color:#e9fbff;font-family:Arial,sans-serif;padding:20px}
+header{text-align:center;padding:25px}
+.orb{width:100px;height:100px;border:2px solid #65eaff;border-radius:50%;margin:auto;display:grid;place-items:center;font-size:42px;box-shadow:0 0 25px #65eaff}
+h1{letter-spacing:3px;color:#65eaff}
+.panel{background:#102238;padding:15px;border-radius:15px;margin:12px 0}
+input,textarea{width:100%;box-sizing:border-box;padding:13px;background:#07111f;color:white;border:1px solid #397087;border-radius:10px;margin:6px 0}
+button{background:#087b8b;color:white;border:0;border-radius:10px;padding:13px;margin:4px;font-size:15px}
+#chat{height:280px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.msg{padding:12px;border-radius:12px;white-space:pre-wrap;line-height:1.4}
+.bot{background:#19344c;align-self:flex-start}
+.user{background:#087080;align-self:flex-end}
+small{color:#a9c2d1}
 </style>
 </head>
 <body>
-<h1>◈ OS GUARDIÕES ◈</h1>
-<p>Seu assistente pessoal está à sua disposição.</p>
-<button onclick="alert('OS GUARDIÕES está pronto para servir!')">
-ATIVAR
-</button>
+<header>
+<div class="orb">◈</div>
+<h1>OS GUARDIÕES</h1>
+<p>SEU ASSISTENTE PESSOAL</p>
+</header>
+
+<div class="panel">
+<label>CHAVE DE IA — OPENROUTER</label>
+<input id="key" type="password" placeholder="Cole sua chave aqui">
+<small>A chave não é salva neste aplicativo. Não a envie pelo chat nem a coloque no código.</small>
+</div>
+
+<div class="panel">
+<div id="chat">
+<div class="msg bot">À sua disposição. Sou OS GUARDIÕES. Como posso ajudá-lo?</div>
+</div>
+<textarea id="msg" placeholder="Digite sua mensagem..."></textarea>
+<button onclick="enviar()">ENVIAR</button>
+<button onclick="ouvir()">🎙️ FALAR</button>
+<button onclick="falar()">🔊 OUVIR RESPOSTA</button>
+<p id="status"><small>Aguardando conexão.</small></p>
+</div>
+
+<script>
+let historico=[
+{role:"system",content:"Você é OS GUARDIÕES, um assistente pessoal inspirado no JARVIS. Fale sempre português brasileiro. Personalidade masculina, elegante, educada, inteligente, leal e prestativa. Seja claro e honesto. Nunca afirme ter realizado ações que não realizou."}
+];
+let ultimaResposta="";
+
+function mensagem(txt,tipo){
+let d=document.createElement("div");
+d.className="msg "+tipo;
+d.textContent=txt;
+document.getElementById("chat").appendChild(d);
+document.getElementById("chat").scrollTop=999999;
+if(tipo==="bot")ultimaResposta=txt;
+}
+
+async function enviar(){
+let campo=document.getElementById("msg");
+let pergunta=campo.value.trim();
+let chave=document.getElementById("key").value.trim();
+
+if(!pergunta)return;
+if(!chave){
+document.getElementById("status").textContent="Insira sua chave OpenRouter.";
+return;
+}
+
+campo.value="";
+mensagem(pergunta,"user");
+historico.push({role:"user",content:pergunta});
+document.getElementById("status").textContent="OS GUARDIÕES está pensando...";
+
+try{
+let resposta=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+method:"POST",
+headers:{
+"Authorization":"Bearer "+chave,
+"Content-Type":"application/json",
+"X-OpenRouter-Title":"OS GUARDIÕES"
+},
+body:JSON.stringify({
+model:"openai/gpt-4o-mini",
+messages:historico
+})
+});
+
+let dados=await resposta.json();
+if(!resposta.ok)throw new Error(dados.error?.message||"Erro de conexão");
+
+let texto=dados.choices[0].message.content;
+historico.push({role:"assistant",content:texto});
+mensagem(texto,"bot");
+document.getElementById("status").textContent="Conectado.";
+}catch(e){
+historico.pop();
+document.getElementById("status").textContent="Erro: "+e.message;
+}
+}
+
+function falar(){
+if(!ultimaResposta)return;
+speechSynthesis.cancel();
+let voz=new SpeechSynthesisUtterance(ultimaResposta);
+voz.lang="pt-BR";
+let vozes=speechSynthesis.getVoices();
+voz.voice=vozes.find(v=>v.lang.toLowerCase()==="pt-br")||null;
+speechSynthesis.speak(voz);
+}
+
+function ouvir(){
+let Reconhecedor=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!Reconhecedor){
+document.getElementById("status").textContent="Microfone não disponível neste navegador. Digite sua mensagem.";
+return;
+}
+let r=new Reconhecedor();
+r.lang="pt-BR";
+r.onresult=e=>{
+document.getElementById("msg").value=e.results[0][0].transcript;
+enviar();
+};
+r.start();
+document.getElementById("status").textContent="Estou ouvindo...";
+}
+</script>
 </body>
 </html>
